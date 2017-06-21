@@ -78,6 +78,12 @@ public class MainController : MonoBehaviour
                         MainThreadExecutor.Enqueue(() => OnSpawn(spawnResponse.Payload));
                         break;
                     }
+                case "delete_item":
+                    {
+                        var deleteMessage = JsonUtility.FromJson<RPC.DeleteItem>(eventArgs.Data);
+                        MainThreadExecutor.Enqueue(() => OnDeleteItem(deleteMessage.Payload));
+                        break;
+                    }
             }
         };
 
@@ -178,5 +184,10 @@ public class MainController : MonoBehaviour
 
             Debug.Log(">> GetItem");
         };
+    }
+
+    void OnDeleteItem(RPC.DeleteItemPayload payload)
+    {
+        Debug.Log("<< DeleteItem");
     }
 }
