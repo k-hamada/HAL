@@ -64,6 +64,16 @@ namespace WebSocketSample.Server
         public void OnGetItem(string senderId, GetItemPayload getItemPayload)
         {
             Console.WriteLine(">> GetItem");
+
+            if (items.ContainsKey(getItemPayload.ItemId))
+            {
+                items.Remove(getItemPayload.ItemId);
+            }
+            else
+            {
+                // アイテムデュプリケートしている状態
+                Console.WriteLine("Not found ItemId: " + getItemPayload.ItemId);
+            }
         }
 
         void Sync()
