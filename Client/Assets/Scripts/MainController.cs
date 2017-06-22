@@ -12,6 +12,7 @@ public class MainController : MonoBehaviour
     Vector3 previousPlayerObjPosition;   // 前フレームでの位置
     int playerId; // プレイヤーID
     Dictionary<int, GameObject> otherPlayerObjs = new Dictionary<int, GameObject>();   // 他プレイヤー
+    Dictionary<int, GameObject> items = new Dictionary<int, GameObject>();
 
     [SerializeField]
     GameObject playerPrefab;
@@ -75,6 +76,18 @@ public class MainController : MonoBehaviour
                     {
                         var spawnResponse = JsonUtility.FromJson<RPC.Spawn>(eventArgs.Data);
                         MainThreadExecutor.Enqueue(() => OnSpawn(spawnResponse.Payload));
+                        break;
+                    }
+                case "delete_item":
+                    {
+                        var deleteMessage = JsonUtility.FromJson<RPC.DeleteItem>(eventArgs.Data);
+                        MainThreadExecutor.Enqueue(() => OnDeleteItem(deleteMessage.Payload));
+                        break;
+                    }
+                case "environment":
+                    {
+                        var environmentMessage = JsonUtility.FromJson<RPC.Environment>(eventArgs.Data);
+                        MainThreadExecutor.Enqueue(() => OnEnvironment(environmentMessage.Payload));
                         break;
                     }
             }
@@ -158,10 +171,54 @@ public class MainController : MonoBehaviour
     {
         Debug.Log("<< OnSpawn");
 
-        Instantiate(
+        SpawnItem(response.Item);
+    }
+
+    void SpawnItem(RPC.Item itemRpc)
+    {
+        var itemObj = Instantiate(
             itemPrefab,
-            new Vector3(response.Position.X, response.Position.Y, response.Position.Z),
+            new Vector3(itemRpc.Position.X, itemRpc.Position.Y, itemRpc.Position.Z),
             Quaternion.identity
         );
+        items.Add(itemRpc.Id, itemObj);
+        var item = itemObj.GetComponent<ItemController>();
+        item.ItemId = itemRpc.Id;
+        item.OnGot += () =>
+        {
+            items.Remove(item.ItemId);
+            Destroy(itemObj);
+
+            var getItemRpc = new RPC.GetItem(new RPC.GetItemPayload(item.ItemId));
+            var getItemJson = JsonUtility.ToJson(getItemRpc);
+            webSocket.Send(getItemJson);
+
+            Debug.Log(">> GetItem");
+        };
+    }
+
+    void OnDeleteItem(RPC.DeleteItemPayload payload)
+    {
+        Debug.Log("<< DeleteItem");
+
+        var itemId = payload.ItemId;
+        if (items.ContainsKey(itemId))
+        {
+            var item = items[itemId];
+            Destroy(item);
+            items.Remove(itemId);
+        }
+    }
+
+    void OnEnvironment(RPC.EnvironmentPayload payload)
+    {
+        Debug.Log("<< Environment");
+
+        foreach (var itemRpc in payload.Items)
+        {
+            if (items.ContainsKey(itemRpc.Id)) continue;
+
+            SpawnItem(itemRpc);
+        }
     }
 }

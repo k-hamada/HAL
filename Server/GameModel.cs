@@ -9,6 +9,7 @@ namespace WebSocketSample.Server
     public class GameModel
     {
         Dictionary<int, Player> players = new Dictionary<int, Player>();
+        Dictionary<int, Item> items = new Dictionary<int, Item>();
         int uidCounter;
 
         public event Action<string, string> sendTo;
@@ -47,6 +48,8 @@ namespace WebSocketSample.Server
             sendTo(loginResponseJson, senderId);
 
             Console.WriteLine(player.ToString() + " login.");
+
+            Environment(senderId);
         }
 
         public void OnPlayerUpdate(string senderId, PlayerUpdatePayload playerUpdatePayload)
@@ -57,6 +60,25 @@ namespace WebSocketSample.Server
             if (players.TryGetValue(playerUpdatePayload.Id, out player))
             {
                 player.SetPosition(playerUpdatePayload.Position);
+            }
+        }
+
+        public void OnGetItem(string senderId, GetItemPayload getItemPayload)
+        {
+            Console.WriteLine(">> GetItem");
+
+            if (items.ContainsKey(getItemPayload.ItemId))
+            {
+                items.Remove(getItemPayload.ItemId);
+
+                var deleteItemRpc = new DeleteItem(new DeleteItemPayload(getItemPayload.ItemId));
+                var deleteItemJson = JsonConvert.SerializeObject(deleteItemRpc);
+                broadcast(deleteItemJson);
+            }
+            else
+            {
+                // アイテムデュプリケートしている状態
+                Console.WriteLine("Not found ItemId: " + getItemPayload.ItemId);
             }
         }
 
@@ -90,15 +112,31 @@ namespace WebSocketSample.Server
                 if (players.Count == 0) return;
 
                 var randomX = random.Next(-5, 5);
-                var randomY = random.Next(9, 11);
                 var randomZ = random.Next(-5, 5);
-                var spawnRpc = new Spawn(new SpawnPayload(new Position(randomX, randomY, randomZ)));
+                var item = new Item(uidCounter++, new Position(randomX, 0.5f, randomZ));
+                items.Add(item.Id, item);
+
+                var spawnRpc = new Spawn(new SpawnPayload(new RPC.Item(item.Id, item.Position)));
                 var spawnJson = JsonConvert.SerializeObject(spawnRpc);
                 broadcast(spawnJson);
 
                 Console.WriteLine("<< Spawn");
             };
             timer.Start();
+        }
+
+        void Environment(string toId)
+        {
+            var itemsRpc = new List<RPC.Item>();
+            foreach (var item in items.Values)
+            {
+                var itemRpc = new RPC.Item(item.Id, item.Position);
+                itemsRpc.Add(itemRpc);
+            }
+
+            var environmentRpc = new RPC.Environment(new EnvironmentPayload(itemsRpc));
+            var environmentJson = JsonConvert.SerializeObject(environmentRpc);
+            sendTo(environmentJson, toId);
         }
     }
 }
