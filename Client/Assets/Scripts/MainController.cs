@@ -167,5 +167,10 @@ public class MainController : MonoBehaviour
         items.Add(response.Item.Id, itemObj);
         var item = itemObj.GetComponent<ItemController>();
         item.ItemId = response.Item.Id;
+        item.OnGot += () =>
+        {
+            items.Remove(item.ItemId);
+            Destroy(itemObj);
+        };
     }
 }
